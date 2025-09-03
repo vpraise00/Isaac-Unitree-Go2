@@ -1,0 +1,12 @@
+# Environment registry: map simple names to USD specs.
+# Values can be:
+# - omniverse/omni/http(s) URL
+# - absolute/relative filesystem path (relative to repo root)
+# - isaaclab://<relative-path-under_IsaacLab_assets>
+#
+# Examples below default to Isaac Lab assets; adjust as needed.
+
+warehouse: isaaclab://Environments/Simple_Warehouse/warehouse.usd
+small_warehouse: isaaclab://Environments/Simple_Warehouse/warehouse.usd
+full_warehouse: isaaclab://Environments/Simple_Warehouse/warehouse.usd
+warehouse_multiple_shelves: isaaclab://Environments/Simple_Warehouse/warehouse.usd

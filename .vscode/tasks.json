@@ -1,0 +1,74 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "GO2 Runner: Teleoperation",
+      "type": "shell",
+      "command": "\"${workspaceFolder}\\tools\\isaac_unitree_go2.bat\" --run_cfg teleoperation --env warehouse --task go2-locomotion",
+      "problemMatcher": []
+    },
+    {
+      "label": "GO2 Runner: Dataset Record",
+      "type": "shell",
+      "command": "\"${workspaceFolder}\\tools\\isaac_unitree_go2.bat\" --run_cfg dataset_record --env warehouse --task go2-locomotion",
+      "problemMatcher": []
+    },
+    {
+      "label": "GO2 Runner: Lab Preview",
+      "type": "shell",
+      "command": "\"${workspaceFolder}\\tools\\isaac_unitree_go2.bat\" --run_cfg lab_preview --env warehouse --task go2-locomotion",
+      "problemMatcher": []
+    },
+    {
+      "label": "GO2 Runner: Custom Task",
+      "type": "shell",
+      "command": "\"${workspaceFolder}\\tools\\isaac_unitree_go2.bat\" --run_cfg custom_task --env warehouse --task go2-locomotion",
+      "problemMatcher": []
+    },
+    {
+      "label": "GO2 Runner: Policy Inference",
+      "type": "shell",
+      "command": "\"${workspaceFolder}\\tools\\isaac_unitree_go2.bat\" --run_cfg policy_inference --env warehouse --task go2-locomotion --checkpoint D:\\path\\to\\policy.pt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Isaac Sim (script-runner)",
+      "type": "shell",
+      "command": "\"D:\\My_Project\\Sim\\isaac-sim-standalone-5.0.0-windows-x86_64\\isaac-sim.bat\" --enable isaacsim.core.nodes,isaacsim.replicator.writers --exec \"${workspaceFolder}\\sim\\scripts\\run_sim.py\"",
+      "options": {
+        "env": {}
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Isaac Sim (extension)",
+      "type": "shell",
+      "command": "\"D:\\My_Project\\Sim\\isaac-sim-standalone-5.0.0-windows-x86_64\\isaac-sim.bat\" --ext-folder \"${workspaceFolder}\\exts\" --enable my.company.go2lab",
+      "problemMatcher": []
+    },
+    {
+      "label": "Record Dataset (script)",
+      "type": "shell",
+      "command": "\"D:\\My_Project\\Sim\\isaac-sim-standalone-5.0.0-windows-x86_64\\isaac-sim.bat\" --enable isaacsim.core.nodes,isaacsim.replicator.writers --exec \"${workspaceFolder}\\sim\\scripts\\dataset_recorder.py\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lab Preview (manager-based test-double)",
+      "type": "shell",
+      "command": "\"D:\\My_Project\\Sim\\isaac-sim-standalone-5.0.0-windows-x86_64\\isaac-sim.bat\" --enable isaacsim.core.nodes --exec \"${workspaceFolder}\\lab\\scripts\\preview_task.py\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Isaac Lab 2.2 task module",
+      "type": "shell",
+      "command": "\"D:\\My_Project\\Sim\\isaac-sim-standalone-5.0.0-windows-x86_64\\isaac-sim.bat\" --enable isaacsim.core.nodes --exec \"${workspaceFolder}\\lab\\scripts\\run_lab2_task.py\" -- --task-module omni.isaac.lab_tasks.manager_based.locomotion.run",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Custom Warehouse Task",
+      "type": "shell",
+      "command": "\"D:\\My_Project\\Sim\\isaac-sim-standalone-5.0.0-windows-x86_64\\isaac-sim.bat\" --enable isaacsim.core.nodes --exec \"${workspaceFolder}\\lab\\scripts\\run_custom_task.py\"",
+      "problemMatcher": []
+    }
+  ]
+}

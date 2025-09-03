@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env/
+
+# VSCode
+.vscode/*.log
+.vscode/ipch/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs
+output/
+logs/
+
+# USD caches / temp
+*.usd_preview_surface
+usd_cache/
+
+# Isaac Sim temp
+kit/logs/
+kit/cache/

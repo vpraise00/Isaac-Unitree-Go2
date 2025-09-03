@@ -1,0 +1,12 @@
+[package]
+name = "my.company.go2lab"
+version = "0.0.1"
+category = "Simulation"
+description = "GO2 warehouse sim with teleoperation and dataset recorder"
+
+[dependencies]
+"isaacsim.core.nodes" = {}
+"isaacsim.replicator.writers" = {}
+
+[[python.module]]
+name = "my.company.go2lab"
