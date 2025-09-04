@@ -1,7 +1,6 @@
-"""Run a custom manager-based task in the warehouse environment (no Isaac Lab dependency).
+"""Run a custom manager-based task in the warehouse environment (no Isaac Lab).
 
-This launches our Go2WarehouseEnv and executes a short rollout. Use this as a template
-for your own task logic or curriculum.
+Launches Go2WarehouseEnv and executes a short rollout. Template for custom tasks.
 """
 from __future__ import annotations
 
@@ -26,11 +25,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     # Ensure repo root import path
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[4]
     if str(repo_root) not in sys.path:
         sys.path.append(str(repo_root))
 
-    from lab.envs.go2_warehouse_env import Go2WarehouseEnv
+    from go2lab.lab.envs.go2_warehouse_env import Go2WarehouseEnv
 
     env = Go2WarehouseEnv(steps_per_episode=args.max_steps, headless=args.headless, control_hz=args.control_hz)
     try:
@@ -38,7 +37,6 @@ def main() -> int:
         LOGGER.info("Custom task reset obs: %s", {k: (v if isinstance(v, (int, float)) else "...") for k, v in obs.items()})
         ret = 0.0
         for t in range(min(300, args.max_steps)):
-            # Replace this with your policy/controller
             action = (random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1))
             obs, r, done, info = env.step(action)
             ret += r
@@ -54,5 +52,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import math  # noqa: F401
     raise SystemExit(main())

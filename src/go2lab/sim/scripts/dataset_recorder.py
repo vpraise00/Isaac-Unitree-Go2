@@ -63,7 +63,8 @@ def main() -> int:
     out_dir = OUT_ROOT / timestamp
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    app = SimulationApp({"headless": False})
+    renderer = os.environ.get("ISAAC_RENDERER", "RayTracedLighting")
+    app = SimulationApp({"headless": False, "renderer": renderer})
     try:
         stage, open_stage, set_on_demand = get_stage_and_backends()
 
@@ -98,17 +99,22 @@ def main() -> int:
         writer.attach([rp])
 
         inp = carb.input.acquire_input_interface()
-        kb = inp.get_keyboard()
+        kb = None  # Isaac Sim 5.0: use deviceId 0 and KeyboardInput enums directly
 
         meta_path = out_dir / "meta.jsonl"
         with meta_path.open("w", encoding="utf-8") as meta_file:
             frames = int(DURATION_SEC * FPS)
             for i in range(frames):
-                boost = inp.is_key_down(kb, KEY_MAP["boost"]) if kb else False
+                def _down(code):
+                    try:
+                        return inp.is_key_down(0, code)  # deviceId 0 = system keyboard
+                    except Exception:
+                        return False
+                boost = _down(KEY_MAP["boost"]) if inp else False
                 spd = 1.5 if boost else 1.0
-                vx = (1.0 if inp.is_key_down(kb, KEY_MAP["forward"]) else 0.0) - (1.0 if inp.is_key_down(kb, KEY_MAP["back"]) else 0.0)
-                vy = (1.0 if inp.is_key_down(kb, KEY_MAP["right"]) else 0.0) - (1.0 if inp.is_key_down(kb, KEY_MAP["left"]) else 0.0)
-                wz = (1.0 if inp.is_key_down(kb, KEY_MAP["yaw_left"]) else 0.0) - (1.0 if inp.is_key_down(kb, KEY_MAP["yaw_right"]) else 0.0)
+                vx = (1.0 if _down(KEY_MAP["forward"]) else 0.0) - (1.0 if _down(KEY_MAP["back"]) else 0.0)
+                vy = (1.0 if _down(KEY_MAP["right"]) else 0.0) - (1.0 if _down(KEY_MAP["left"]) else 0.0)
+                wz = (1.0 if _down(KEY_MAP["yaw_left"]) else 0.0) - (1.0 if _down(KEY_MAP["yaw_right"]) else 0.0)
                 ctrl.set_cmd(vx * MAX_VX * spd, vy * MAX_VY * spd, wz * MAX_WZ * spd)
 
                 app.update()

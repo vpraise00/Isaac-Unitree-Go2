@@ -10,3 +10,4 @@ warehouse: isaaclab://Environments/Simple_Warehouse/warehouse.usd
 small_warehouse: isaaclab://Environments/Simple_Warehouse/warehouse.usd
 full_warehouse: isaaclab://Environments/Simple_Warehouse/warehouse.usd
 warehouse_multiple_shelves: isaaclab://Environments/Simple_Warehouse/warehouse.usd
+office: isaaclab://Environments/Simple_Warehouse/warehouse.usd  # TODO: replace with Office USD if available in Lab assets

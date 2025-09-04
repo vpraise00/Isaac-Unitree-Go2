@@ -1,32 +1,13 @@
-# Wrapper to import kit helpers from legacy location
-"""Isaac Sim 5.0 helpers to get/open stage and set on-demand compute (packaged)."""
+"""Isaac Sim 5.0 helpers for stage access and OmniGraph compute mode.
+
+This module avoids legacy, pre-5.0 APIs and uses carb settings to enable on-demand compute.
+"""
 from __future__ import annotations
 
 from typing import Callable, Tuple
 
 
 def get_stage_and_backends():
-	try:
-		from isaacsim.core.api import core as core_api  # type: ignore
-		from pxr import Usd  # noqa: F401
-
-		core = core_api.get_core()
-		stage = core.get_stage()
-
-		def _open(uri: str) -> None:
-			core.open_stage(uri)  # type: ignore[attr-defined]
-
-		def _on_demand() -> None:
-			try:
-				from isaacsim.core.nodes import og  # type: ignore
-				og.set_compute_mode("on_demand")
-			except Exception:
-				pass
-
-		return stage, _open, _on_demand
-	except Exception:
-		pass
-
 	import omni.usd as ou  # type: ignore
 
 	ctx = ou.get_context()
@@ -36,10 +17,15 @@ def get_stage_and_backends():
 		ctx.open_stage(uri)
 
 	def _on_demand() -> None:
+		# Preferred path: set OmniGraph compute mode via carb settings
 		try:
-			from isaacsim.core.nodes import og  # type: ignore
-			og.set_compute_mode("on_demand")
+			import carb  # type: ignore
+
+			settings = carb.settings.get_settings()  # type: ignore[attr-defined]
+			# Known settings path for OmniGraph compute mode
+			settings.set_string("/omni/graph/computeMode", "on_demand")
 		except Exception:
+			# Best-effort: ignore if unavailable
 			pass
 
 	return stage, _open, _on_demand
