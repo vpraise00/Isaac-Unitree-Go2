@@ -1,9 +1,6 @@
 """Run an external Isaac Lab 2.2 manager-based task module under Isaac Sim 5.0.
 
-Usage inside Isaac Sim (VS Code task provided):
-  --task-module <python.module.path> [--lab-path <path-to-isaac-lab-root>] [--headless] [--no-preload-app]
-
-This wrapper avoids copying any Isaac Lab code. Point it to your local Isaac Lab 2.2 repo.
+This wrapper avoids copying Isaac Lab. Point it to your local Isaac Lab 2.2 repo.
 """
 from __future__ import annotations
 
@@ -17,7 +14,13 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("lab.run_lab2")
 
-DEFAULT_CFG = Path(__file__).resolve().parents[2] / "configs/lab2_config.json"
+
+def _repo_root() -> Path:
+    # src/go2lab/lab/scripts -> repo
+    return Path(__file__).resolve().parents[4]
+
+
+DEFAULT_CFG = _repo_root() / "configs/lab2_config.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,8 +48,8 @@ def load_lab_path(cli_value: str | None) -> Path | None:
 def main() -> int:
     args = parse_args()
 
-    # Ensure repo root is importable (for our lab.* modules if needed)
-    repo_root = Path(__file__).resolve().parents[2]
+    # Ensure repo root is importable (for our go2lab.* modules if needed)
+    repo_root = _repo_root()
     if str(repo_root) not in sys.path:
         sys.path.append(str(repo_root))
 
@@ -66,7 +69,9 @@ def main() -> int:
                 from isaacsim import SimulationApp  # type: ignore
             except Exception:
                 from isaacsim.simulation_app import SimulationApp  # type: ignore
-            app = SimulationApp({"headless": bool(args.headless)})
+            import os
+            renderer = os.environ.get("ISAAC_RENDERER", "RayTracedLighting")
+            app = SimulationApp({"headless": bool(args.headless), "renderer": renderer})
             LOGGER.info("SimulationApp created (headless=%s)", bool(args.headless))
         except Exception as e:
             LOGGER.error("Failed to create SimulationApp: %s", e)
@@ -77,7 +82,6 @@ def main() -> int:
         runpy.run_module(args.task_module, run_name="__main__")
         return 0
     except SystemExit as se:
-        # Propagate exit codes from the module
         code = int(getattr(se, "code", 0) or 0)
         LOGGER.info("Module exited with code=%s", code)
         return code

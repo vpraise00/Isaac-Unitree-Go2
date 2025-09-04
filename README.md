@@ -1,15 +1,52 @@
-# Isaac-Unitree-Go2 — GO2 Lab Sim (Isaac Sim 5.0 + Isaac Lab 2.2)
+# Isaac-Unitree-Go2 (Windows 11, Isaac Sim 5.0, Isaac Lab 2.2)
 
-Windows 11 환경에서 Isaac Sim 5.0 GUI와 Isaac Lab 2.2 스타일로 Unitree GO2를 시뮬레이션/조작/데이터 수집하는 레포지토리입니다. 본 단계에서는 ROS 2/브리지는 사용하지 않습니다.
+이 저장소는 go2_omniverse(구 Isaac Sim/Orbit 기반) 프로젝트를 Windows 11 + Isaac Sim 5.0 + Isaac Lab 2.2 환경으로 포팅/재구성한 버전입니다. ROS 2/Humble 및 실제 로봇 연동은 제외하고, 레포 내부에서 제공하는 창고/오피스류 환경을 불러와 GO2를 조작/학습하는 워크플로우를 제공합니다.
 
-- 시뮬레이터: Isaac Sim 5.0 (standalone, GUI)
-- 학습 프레임: Isaac Lab 2.2
-- 이번 단계 목표:
-  1) GO2 기반 태스크 스켈레톤(Lab 2.2 스타일)
-  2) 최소 Warehouse 환경(절차적 생성 또는 USD 저장/로드)
-  3) 키보드 조작과 동시 데이터셋 기록(RGB/Depth/Semantic/Instance + 메타)
+- OS: Windows 11
+- Simulator: Isaac Sim 5.0 Standalone (GUI)
+- Learning: Isaac Lab 2.2 (manager-based tasks + RSL-RL wrappers)
+- ROS 2: 사용하지 않음 (코드/구조는 시뮬 전용)
 
-프로젝트 구조는 저장소 루트 기준(`sim/`, `exts/`, `lab/`, `docs/`)으로 정리되었습니다.
+주요 차이점
+- 구 레포(go2_omniverse)의 Orbit/ROS2 구성 대신, 본 레포는 Lab 2.2 + 5.0 네임스페이스(isaacsim.*)를 사용합니다.
+- 창고/오피스 환경은 Isaac Lab 자산 또는 로컬 USD로 로드하며, Windows 경로 규칙과 5.0의 렌더러/입력/On-Demand 규칙을 따릅니다.
+
+포팅 체크리스트(진행 상황)
+- 구조/런타임
+  - [x] Windows 배치 실행기(`tools/isaac_unitree_go2.bat`) 추가 (Isaac Sim 5.0 호출 → Python 러너)
+  - [x] 통합 러너(`tools/isaac_unitree_go2.py`): --run_cfg, --env, --task, --algorithm/--checkpoint, --headless, --render_mode
+  - [x] 5.0 입력/렌더/OmniGraph On-Demand 호환 (carb.input.is_key_down / RayTracedLighting / carb.settings)
+  - [x] 확장(`exts/my.company.go2lab`): omni.usd 컨텍스트 + settings 기반 On-Demand, GO2 스폰
+  - [x] 레코더(`isaacsim.replicator.writers`) 호환 및 입력 이벤트 갱신
+- 환경/자산
+  - [x] 환경 레지스트리(`env/registry.yaml`): warehouse 등 이름별 매핑
+  - [ ] office 등 추가 환경 매핑(Isaac Lab 자산 경로 확인 후 반영)
+  - [x] USD 경로 유틸(로컬/URL/isaaclab:// 스킴) 및 로드 정책 정비
+- 조작/실행
+  - [x] Teleop(키보드) — GO2 항상 스폰, 초기 포즈 적용, 입력 생략 모드(SKIP_INPUT)
+  - [x] Dataset Recorder — 카메라/채널 선택, 프레임 메타(JSONL)
+  - [x] 빈 스테이지 실행 옵션 및 안전한 SimulationApp 라이프사이클
+- 학습/추론
+  - [x] RL 로코모션 러너(`locomotion_runner.py`): Isaac-Velocity-Flat-Unitree-Go2-v0 실행, RSL-RL 체크포인트 로드
+  - [x] 레포 내 RL env/cfg 네임스페이스(`src/go2lab/rl/...`) 정리
+  - [ ] Rough 변형/다중 환경/속도 향상(headless batch) 프리셋 추가
+
+디렉터리 개요(포팅 후)
+- tools/
+  - isaac_unitree_go2.bat — Windows용 Isaac Sim 5.0 실행 래퍼
+  - isaac_unitree_go2.py — 통합 러너(teleop/train/test/locomotion RL)
+- src/go2lab/
+  - sim/scripts/ — run_sim, teleop_keyboard, dataset_recorder, train/test/locomotion_runner
+  - sim/util/ — kit(OmniGraph on-demand), usd_path 등
+  - rl/ — go2_ctrl_cfg/go2_ctrl + envs/go2_env (Lab 2.2용)
+  - world.py, env_registry.py — 환경 로더/매핑
+- env/registry.yaml — 환경 이름 → USD 스펙 매핑(isaaclab:// 스킴 지원)
+- exts/my.company.go2lab — Isaac Sim 확장(시작 시 환경/GO2 준비)
+
+go2_omniverse 대비 매핑
+- Orbit 기반 스크립트(main.py, omniverse_sim.py 등) → tools/runner + src/go2lab/sim/scripts/* 로 대체
+- ROS2 관련(ws, msg, nodes) → 포함하지 않음(시뮬 전용)
+- terrain/omnigraph 커스텀 요소 → Lab 2.2 매니저/태스크로 점진 전환(필요 시 포팅)
 
 ## 사전 준비
 - Windows 11
@@ -25,6 +62,7 @@ VS Code 메뉴에서 Terminal > Run Task를 열고 아래 태스크를 실행하
 
 1) Run Isaac Sim (script-runner)
 - GUI 실행 → Warehouse 스테이지 로드 또는 생성 → 최소 240 프레임 업데이트 후 종료.
+  - 성능 우선 렌더링: 배치/러너에 `--render_mode performance` 추가 (기본 RTX 실시간)
 
 2) Run Isaac Sim (extension)
 - `my.company.go2lab` 확장을 활성화해 GUI 실행.
@@ -32,9 +70,10 @@ VS Code 메뉴에서 Terminal > Run Task를 열고 아래 태스크를 실행하
 
 3) Record Dataset (script)
 - GUI 실행, GO2 스폰, 카메라 설정, BasicWriter로 출력(`output/<timestamp>/`).
+  - `--render_mode performance`로 프레임 드랍을 줄일 수 있습니다.
 - 실행 중 키보드로 조작하면서 동시에 기록 가능.
 
-참고: 에디터에서 `pxr`, `carb`, `isaacsim.*` 임포트가 해석되지 않는 것은 정상입니다(Isaac Sim 런타임에서 제공). 항상 위 태스크를 통해 실행하세요.
+참고: 에디터에서 `pxr`, `carb`, `isaacsim.*` 임포트가 해석되지 않는 것은 정상입니다(Isaac Sim 런타임에서 제공). 항상 배치/태스크를 통해 실행하세요.
 
 ## 조작법 (키보드)
 - 이동: W/S(전/후), A/D(좌/우)
@@ -64,16 +103,16 @@ VS Code 메뉴에서 Terminal > Run Task를 열고 아래 태스크를 실행하
   - `REC_DURATION_SEC` (기본 30)
 
 ## 폴더 구조 개요
-- `sim/scripts/run_sim.py` — GUI 실행, Warehouse 오픈/생성, 프레임 스텝, On Demand 적용.
-- `sim/scripts/warehouse_gen.py` — 절차적 Warehouse 생성, `sim/usd/warehouse_min.usd` 저장 옵션.
-- `sim/scripts/spawn_go2.py` — GO2 스폰/리셋 + 간단 베이스 컨트롤러(클램핑/브레이크).
-- `sim/scripts/teleop_keyboard.py` — `carb.input` 기반 키보드 조작.
-- `sim/scripts/dataset_recorder.py` — `isaacsim.replicator.writers` BasicWriter로 기록.
+- src/go2lab/sim/scripts/run_sim.py — GUI 실행, Warehouse 오픈/생성, 프레임 스텝, On Demand 적용.
+- src/go2lab/sim/scripts/warehouse_gen.py — 절차적 Warehouse 생성, 저장 옵션.
+- src/go2lab/sim/scripts/spawn_go2.py — GO2 스폰/리셋 + 간단 베이스 컨트롤러.
+- src/go2lab/sim/scripts/teleop_keyboard.py — `carb.input` 기반 키보드 조작.
+- src/go2lab/sim/scripts/dataset_recorder.py — `isaacsim.replicator.writers` BasicWriter로 기록.
 - `exts/my.company.go2lab/` — Isaac Sim 확장(시작 시 스테이지/환경/GO2 준비, On Demand 적용).
-- `lab/tasks/go2_task_config.yaml` — Isaac Lab 2.2 태스크 스켈레톤.
-- `lab/core/managers.py` — manager 기반 테스트 더블(Action/Sensor/Reward) 구현.
-- `lab/envs/go2_warehouse_env.py` — Isaac Sim에서 동작하는 GO2 warehouse 테스트 더블 환경.
-- `lab/scripts/preview_task.py` — YAML 로드 후 랜덤 정책으로 짧은 롤아웃 실행.
+- `configs/go2_task_config.yaml` — Isaac Lab 2.2 태스크 스켈레톤.
+- `src/go2lab/core/managers.py` — manager 기반 테스트 더블(Action/Sensor/Reward) 구현.
+- `src/go2lab/lab/envs/go2_warehouse_env.py` — Isaac Sim에서 동작하는 GO2 warehouse 테스트 더블 환경.
+- src/go2lab/lab/scripts/preview_task.py — YAML 로드 후 랜덤 정책으로 짧은 롤아웃 실행.
 - `docs/CONTEXT.md` — 전체 흐름/가드레일/DoD.
 - `docs/MAPPINGS_45_to_50.md` — 4.5/1.x → 5.0/2.2 네임스페이스 매핑.
 
@@ -130,7 +169,7 @@ VS Code 메뉴에서 Terminal > Run Task를 열고 아래 태스크를 실행하
 4) Manager 기반 프리뷰 확인
 - 태스크: "Lab Preview (manager-based test-double)" 실행
 - 기대 결과: 터미널 로그에 reset obs 요약, rollout finished(steps, return) 출력 후 종료
-- 파라미터 변경: `lab/tasks/go2_task_config.yaml`에서 physics_hz/control_hz/max_episode_length 수정 가능
+- 파라미터 변경: `configs/go2_task_config.yaml`에서 physics_hz/control_hz/max_episode_length 수정 가능
 
 5) 공식 Isaac Lab 2.2 태스크 실행
 - `configs/lab2_config.json`에서 `lab_repo` 경로가 올바른지 확인
@@ -140,11 +179,11 @@ VS Code 메뉴에서 Terminal > Run Task를 열고 아래 태스크를 실행하
 6) 커스텀 창고 태스크 실행
 - 태스크: "Run Custom Warehouse Task" 실행
 - 기대 결과: 로컬 warehouse 환경에서 짧은 롤아웃 수행, steps/return 로그 표시
-- 커스터마이즈: `lab/scripts/run_custom_task.py`에서 보상/정책/종료 로직 확장
+- 커스터마이즈: `src/go2lab/lab/scripts/run_custom_task.py`에서 보상/정책/종료 로직 확장
 
 ### 태스크별 파라미터 변경 팁
 - 전역 파라미터는 주로 `.vscode/tasks.json` 혹은 각 스크립트의 인자/설정 파일에서 제어
-- 예) 프리뷰 주기: `lab/tasks/go2_task_config.yaml`의 `control_hz`
+- 예) 프리뷰 주기: `configs/go2_task_config.yaml`의 `control_hz`
 - 예) 커스텀 태스크: `run_custom_task.py` 인자 `--max-steps`, `--control-hz`, `--headless`
 
 ### Windows 명령줄로 직접 실행 (선택)
@@ -181,10 +220,10 @@ VS Code 태스크 대신 명령줄에서 직접 실행할 수도 있습니다(�
 
 ## 커스텀 창고 태스크 실행(레포 내 테스트 더블)
 - VS Code 태스크: "Run Custom Warehouse Task" 실행.
-- `lab/scripts/run_custom_task.py`가 로컬 `Go2WarehouseEnv`와 Manager 테스트 더블을 사용해 짧은 롤아웃을 수행합니다.
+- `src/go2lab/lab/scripts/run_custom_task.py`가 로컬 `Go2WarehouseEnv`와 Manager 테스트 더블을 사용해 짧은 롤아웃을 수행합니다.
 - 이 스크립트를 복사/수정해 나만의 보상/정책/커리큘럼을 구현할 수 있습니다.
 
-참고: 레포는 단일 루트 구조(sim/, exts/, lab/, docs/)로 정리되어 있습니다.
+참고: 레포는 단일 루트 구조(src/go2lab, exts/, docs/)로 정리되어 있습니다.
 
 ## 통합 실행 러너 (CLI)
 다음 배치/파이썬 러너로 환경과 실행 구성을 한 번에 지정할 수 있습니다.
@@ -196,6 +235,12 @@ VS Code 태스크 대신 명령줄에서 직접 실행할 수도 있습니다(�
 ```cmd
 tools\isaac_unitree_go2.bat --run_cfg teleoperation --env warehouse_multiple_shelves --task go2-locomotion
 ```
+
+렌더링 모드 지정:
+```cmd
+tools\isaac_unitree_go2.bat --run_cfg teleoperation --env warehouse --render_mode performance
+```
+지원값: performance | quality | pathtraced (pathtraced는 매우 느림)
 
 지원 run_cfg:
 - `teleoperation` (키보드 조작)
@@ -211,7 +256,7 @@ tools\isaac_unitree_go2.bat --run_cfg teleoperation --env warehouse_multiple_she
 
 ## 리팩토링 메모: 디렉터리 정리 및 소스 패키지화
 - 핵심 코드는 `src/go2lab` 패키지로 이동/집중되었습니다.
-- `sim/`과 `lab/`의 일부 모듈은 하위 호환을 위해 남겨두고, 내부적으로 `go2lab` 구현을 재사용합니다.
+- 모든 모듈은 `src/go2lab` 아래의 단일 소스 오브 트루스를 사용합니다.
 - 확장과 통합 러너는 가능하면 `go2lab.*` 네임스페이스를 우선 사용합니다.
 - 새로 추가된 설정 파일은 `configs/` 디렉터리에 위치합니다.
 
@@ -231,7 +276,7 @@ tools\isaac_unitree_go2.bat --run_cfg teleoperation --env warehouse_multiple_she
 - [x] src/go2lab 패키지화 및 경로 주입(러너/확장)
 - [x] sim/, lab/ 모듈은 go2lab 재사용으로 중복 제거
 - [x] configs/ 디렉터리 신설(lab2_config.json 이동)
-- [ ] 빈 디렉터리 정리(src/go2lab/lab/scripts 등) 및 불필요 파일 정돈
+- [x] 빈 디렉터리 정리 및 불필요 파일 정돈(스크립트는 src/go2lab/* 로 통일)
 - [ ] 간단한 패키징/의존성 명세(문서화 중심; Isaac 런타임 의존 알림)
 
 2) USD/자산/월드

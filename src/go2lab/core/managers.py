@@ -1,11 +1,11 @@
-"""Minimal manager-based test double for Isaac Lab 2.2 style tasks.
+"""Minimal manager-based test double for Isaac Lab 2.2 style tasks (canonical).
 
 This does NOT depend on Isaac Lab runtime. It mirrors the idea of managers:
 - ActionManager: scales/clamps actions and applies to controller
 - SensorManager: builds observation dict from USD transform, computes vel/height/quat
 - RewardManager: combines forward progress, smoothness, survive, lateral penalty, uprightness
 
-Environment runs in Isaac Sim 5.0 via our existing sim scripts/utilities.
+Environment runs in Isaac Sim 5.0 via our existing sim utilities.
 """
 from __future__ import annotations
 
@@ -47,7 +47,6 @@ class SensorManager:
     @staticmethod
     def _yaw_from_mat(m: Gf.Matrix4d) -> float:
         # yaw from rotation matrix (z-up)
-        # m = [ [r00 r01 r02 ...], [r10 r11 r12 ...], ... ]
         r00 = m[0][0]
         r10 = m[1][0]
         return math.atan2(r10, r00)
@@ -133,3 +132,11 @@ class RewardManager:
             "upright": upright,
             "reward": total,
         }
+
+
+__all__ = [
+    "ActionSpec",
+    "ActionManager",
+    "SensorManager",
+    "RewardManager",
+]

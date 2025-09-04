@@ -1,0 +1,5 @@
+# Minimal GO2 task preview configuration
+physics_hz: 120
+control_hz: 30
+env:
+  max_episode_length: 200

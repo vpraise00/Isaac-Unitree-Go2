@@ -25,7 +25,9 @@ def main() -> int:
     kind, target, ok = resolve_usd_spec(spec, repo_root)
     stage_path = Path(target) if kind == "path" else None
 
-    app_args = {"headless": False, "renderer": "RayTracedLighting"}
+    # Renderer selection from env (set by tools/isaac_unitree_go2.py)
+    renderer = os.environ.get("ISAAC_RENDERER", "RayTracedLighting")
+    app_args = {"headless": False, "renderer": renderer}
     if stage_path is not None and stage_path.exists():
         app_args["open_usd"] = str(stage_path)
     sim_app = SimulationApp(app_args)
@@ -49,8 +51,12 @@ def main() -> int:
             return 2
 
         steps = max(DEFAULT_STEPS, 1)
-        for _ in range(steps):
-            sim_app.update()
+        try:
+            for _ in range(steps):
+                sim_app.update()
+        except KeyboardInterrupt:
+            LOGGER.info("Ctrl+C detected; exiting without save prompt")
+            os._exit(130)
         return 0
     except Exception as exc:
         LOGGER.exception("Simulation failed: %s", exc)

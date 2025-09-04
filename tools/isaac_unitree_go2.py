@@ -5,30 +5,49 @@ import os
 import sys
 from pathlib import Path
 
-# This runner is executed by Isaac Sim's --exec. It dispatches to scripts based on --run_cfg.
-# Example: --run_cfg teleoperation --env warehouse_multiple_shelves --task go2-locomotion
-
+# This runner is executed by Isaac Sim's --exec. It dispatches per the new schema.
 RUN_CHOICES = [
-    "teleoperation",        # sim/scripts/teleop_keyboard.py
-    "dataset_record",       # sim/scripts/dataset_recorder.py
-    "lab_preview",          # lab/scripts/preview_task.py
-    "lab_task_module",      # lab/scripts/run_lab2_task.py (requires --task-module)
-    "custom_task",          # lab/scripts/run_custom_task.py
-    "script_runner",        # sim/scripts/run_sim.py
-    "policy_inference",     # lab/scripts/policy_inference_lab_go2.py (requires --checkpoint)
+    "train",
+    "test",
+    "teleoperation",
 ]
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--run_cfg", required=True, choices=RUN_CHOICES)
-    p.add_argument("--env", default="warehouse", help="Env name or direct USD spec (see env/registry.yaml).")
-    p.add_argument("--task", default="go2-locomotion", help="Task name (for logging or future dispatch)")
-    p.add_argument("--task-module", default=None, help="When run_cfg=lab_task_module, python module path to run")
-    p.add_argument("--agents", choices=["single", "multi"], default="single", help="Agent mode")
-    p.add_argument("--checkpoint", default=None, help="When run_cfg=policy_inference, path to checkpoint .pt/.pth")
+    # New schema
+    p.add_argument("--run_cfg", required=False, choices=RUN_CHOICES, help="train | test | teleoperation")
+    p.add_argument("--env", default=None, help="Warehouse env name or direct USD spec. Omit for empty world.")
+    p.add_argument(
+        "--task",
+        choices=["locomotion", "locomanipulation"],
+        default=None,
+        help="Task type. If omitted, task is unspecified. locomanipulation is a placeholder for now.",
+    )
+    p.add_argument("--algorithm", choices=["RL", "IL"], default=None, help="Only valid with --run_cfg train")
+    p.add_argument("--checkpoint", default=None, help=".pt file for test inference (valid with --run_cfg test)")
     p.add_argument("--headless", action="store_true")
-    return p.parse_args()
+    p.add_argument(
+        "--render_mode",
+        "--rendering_mode",
+        dest="render_mode",
+        choices=["performance", "quality", "pathtraced"],
+        default=None,
+        help="Renderer preset: performance/quality/pathtraced. Maps to SimulationApp renderer.",
+    )
+    # Some Kit launchers can drop argv; support a fallback via env
+    argv = sys.argv[1:]
+    if not argv:
+        raw = os.environ.get("ISAAC_RUN_ARGS", "").strip()
+        if raw:
+            argv = raw.split()
+    args = p.parse_args(argv)
+    # Validate cross-arg dependencies
+    if args.algorithm and args.run_cfg != "train":
+        p.error("--algorithm is only valid with --run_cfg train")
+    if args.checkpoint and args.run_cfg != "test":
+        p.error("--checkpoint is only valid with --run_cfg test")
+    return args
 
 
 def main() -> int:
@@ -41,59 +60,67 @@ def main() -> int:
         if str(p) not in sys.path:
             sys.path.append(str(p))
 
-    # Allow selection of env by name or direct spec
-    # Prefer go2lab namespace if available
-    try:
-        from go2lab.env_registry import resolve_env
-    except Exception:
-        from sim.env_registry import resolve_env
-    kind, target, ok = resolve_env(args.env, repo_root)
-    # Expose the resolved env choice via WAREHOUSE_USD so underlying scripts pick it up
-    os.environ["WAREHOUSE_USD"] = target
-    os.environ["TASK_NAME"] = args.task
-    os.environ["AGENT_MODE"] = args.agents
+    # Resolve env spec (name or direct path/url). If omitted, leave empty (no warehouse).
+    target = None
+    if args.env:
+        try:
+            from go2lab.env_registry import resolve_env
+            kind, target, ok = resolve_env(args.env, repo_root)
+            if ok and (target or "").strip().lower() not in ("", "empty", "none"):
+                os.environ["WAREHOUSE_USD"] = target
+            else:
+                os.environ["WAREHOUSE_USD"] = "empty"
+        except Exception:
+            # Best-effort: if a direct path/url was given, pass it through
+            os.environ["WAREHOUSE_USD"] = args.env
+    else:
+        os.environ["WAREHOUSE_USD"] = "empty"
 
-    headless_flag = "--headless" if args.headless else ""
+    # Task and mode flags
+    if args.task:
+        os.environ["TASK_NAME"] = args.task
+    if args.algorithm:
+        os.environ["ALGORITHM"] = args.algorithm
+    if args.checkpoint:
+        os.environ["CHECKPOINT_PATH"] = args.checkpoint
+    if args.render_mode:
+        # Export chosen render mode for downstream scripts
+        os.environ["RENDER_MODE"] = args.render_mode
+        # Map to SimulationApp 'renderer' arg for Isaac Sim 5.0
+        # - performance/quality -> RayTracedLighting (real-time RTX)
+        # - pathtraced -> PathTracing (offline-quality; slow)
+        mapped = "PathTracing" if args.render_mode == "pathtraced" else "RayTracedLighting"
+        os.environ["ISAAC_RENDERER"] = mapped
 
-    # Dispatch to underlying scripts (all of them already read WAREHOUSE_USD)
+    # Dispatch per new schema
+    if args.headless:
+        os.environ["HEADLESS"] = "1"
+
     if args.run_cfg == "teleoperation":
-        # Prefer src/go2lab scripts when present
-        exec_path = (repo_root / "src/go2lab/sim/scripts/teleop_keyboard.py")
-        if not exec_path.exists():
-            exec_path = repo_root / "sim/scripts/teleop_keyboard.py"
+        # Enable keyboard loop
+        os.environ.pop("SKIP_INPUT", None)
+        exec_path = repo_root / "src/go2lab/sim/scripts/teleop_keyboard.py"
         return run_exec(exec_path)
-    if args.run_cfg == "dataset_record":
-        exec_path = (repo_root / "src/go2lab/sim/scripts/dataset_recorder.py")
-        if not exec_path.exists():
-            exec_path = repo_root / "sim/scripts/dataset_recorder.py"
+    if args.run_cfg == "train":
+        # For locomotion task without warehouse env, run Isaac-Velocity-Flat-Unitree-Go2-v0 RL loop
+        if (args.task == "locomotion") and (os.environ.get("WAREHOUSE_USD", "empty") in ("empty", "none", "")):
+            exec_path = repo_root / "src/go2lab/sim/scripts/locomotion_runner.py"
+            return run_exec(exec_path)
+        exec_path = repo_root / "src/go2lab/sim/scripts/train_runner.py"
         return run_exec(exec_path)
-    if args.run_cfg == "lab_preview":
-        exec_path = repo_root / "lab/scripts/preview_task.py"
+    if args.run_cfg == "test":
+        exec_path = repo_root / "src/go2lab/sim/scripts/test_runner.py"
         return run_exec(exec_path)
-    if args.run_cfg == "lab_task_module":
-        exec_path = repo_root / "lab/scripts/run_lab2_task.py"
-        # pass through task module if provided
-        if args.task_module:
-            sys.argv = [str(exec_path), "--task-module", args.task_module, *( ["--headless"] if args.headless else [] )]
-        return run_module_exec(exec_path)
-    if args.run_cfg == "custom_task":
-        exec_path = repo_root / "lab/scripts/run_custom_task.py"
-        return run_exec(exec_path, extra=["--headless"] if args.headless else [])
-    if args.run_cfg == "script_runner":
-        exec_path = (repo_root / "src/go2lab/sim/scripts/run_sim.py")
-        if not exec_path.exists():
-            exec_path = repo_root / "sim/scripts/run_sim.py"
-        return run_exec(exec_path)
-    if args.run_cfg == "policy_inference":
-        exec_path = repo_root / "lab/scripts/policy_inference_lab_go2.py"
-        extra: list[str] = []
-        if args.checkpoint:
-            extra += ["--checkpoint", args.checkpoint]
-        if args.headless:
-            extra += ["--headless"]
-        return run_exec(exec_path, extra=extra)
 
-    raise SystemExit(2)
+    # No run_cfg provided:
+    # - If locomotion task selected and no env set, run the locomotion RL viewer (policy inference)
+    if (args.task == "locomotion") and (os.environ.get("WAREHOUSE_USD", "empty") in ("empty", "none", "")):
+        exec_path = repo_root / "src/go2lab/sim/scripts/locomotion_runner.py"
+        return run_exec(exec_path)
+    # - Otherwise: compose env and spawn GO2 without input loop
+    os.environ["SKIP_INPUT"] = "1"
+    exec_path = repo_root / "src/go2lab/sim/scripts/teleop_keyboard.py"
+    return run_exec(exec_path)
 
 
 def run_exec(script: Path, extra: list[str] | None = None) -> int:

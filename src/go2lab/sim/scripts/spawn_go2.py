@@ -13,9 +13,13 @@ from pxr import Usd, UsdGeom, Sdf, Gf
 
 LOGGER = logging.getLogger("spawn_go2")
 
-GO2_DEFAULT_PATH = "/World/Go2"
+# Default prim path aligned with user's preference
+GO2_DEFAULT_PATH = "/go2"
 GO2_USD_ENV = "GO2_USD"
-GO2_LOCAL_USD = "sim/usd/go2.usd"
+GO2_LOCAL_USD = "go2.usd"
+DEFAULT_GO2_URL = (
+    "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.0/Isaac/Robots/Unitree/Go2/go2.usd"
+)
 
 MAX_LIN = 1.2
 MAX_ANG = 1.5
@@ -44,7 +48,8 @@ def _resolve_go2_usd(repo_root: Path) -> tuple[str, str | None]:
     local = repo_root / GO2_LOCAL_USD
     if local.exists():
         return ("path", str(local))
-    return ("none", None)
+    # Fallback to the public Omniverse asset URL if nothing else is found
+    return ("url", DEFAULT_GO2_URL)
 
 
 def spawn_placeholder(stage: Usd.Stage, path: str = GO2_DEFAULT_PATH) -> Usd.Prim:
@@ -63,7 +68,7 @@ def spawn_go2(stage: Usd.Stage, repo_root: Path, path: str = GO2_DEFAULT_PATH) -
     return prim
 
 
-def reset_pose(stage: Usd.Stage, prim_path: str = GO2_DEFAULT_PATH, pos=(0.0, 0.0, 0.45), yaw: float = 0.0) -> None:
+def reset_pose(stage: Usd.Stage, prim_path: str = GO2_DEFAULT_PATH, pos=(0.0, 0.0, 0.5), yaw: float = 0.0) -> None:
     prim = stage.GetPrimAtPath(prim_path)
     if not prim:
         return
